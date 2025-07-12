@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-# Импортируем класс комментария.
+# Импортируем класс заметки.
 from notes.models import Note
 
 # Получаем модель пользователя.
@@ -17,8 +17,10 @@ class TestRoutes(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        # Создаём автора и читателя
         cls.author = User.objects.create(username='author')
         cls.reader = User.objects.create(username='reader')
+        # Создаём заметку от имени автора
         cls.note = Note.objects.create(
             title='Тестовая заметка',
             text='Текст заметки',
@@ -26,14 +28,8 @@ class TestRoutes(TestCase):
             slug='test-note'
         )
 
-    # От имени одного пользователя создаём комментарий к новости:
-    # cls.note = Note.objects.create(
-    #     note=cls.note,
-    #     author=cls.author,
-    #     text='Текст комментария'
-    # )
-
     def test_pages_availability(self):
+        # Тестируем страницы доступные всем.
         urls = (
             ('notes:home', None, 'get'),
             ('users:login', None, 'get'),
@@ -57,7 +53,7 @@ class TestRoutes(TestCase):
         for user, status in users_statuses:
             # Производим вход пользователя в клиенте:
             self.client.force_login(user)
-            # Для каждой пары "пользователь - ожидаемый ответ"
+            # Для каждой пары "пользователь — ожидаемый ответ"
             # перебираем имена тестируемых страниц:
             for name in ('notes:edit', 'notes:delete', 'notes:detail',):
                 with self.subTest(user=user, name=name):
@@ -79,7 +75,7 @@ class TestRoutes(TestCase):
         ):
             with self.subTest(name=name):
                 # Получаем адрес страницы работы с заметкой или,
-                # если её имя не указано, общие страницы:
+                # если её имя не указано, то общие.
                 if slug:
                     url = reverse(name, args=(self.note.slug,))
                 else:
