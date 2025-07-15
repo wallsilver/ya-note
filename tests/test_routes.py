@@ -45,6 +45,15 @@ class TestRoutes(TestCase):
                     response = self.client.post(url)
                 self.assertEqual(response.status_code, HTTPStatus.OK)
 
+    def test_availability_list_done_add(self):
+        user = self.author
+        self.client.force_login(user)
+        for name in ('notes:list', 'notes:success', 'notes:add',):
+            with self.subTest(user=user, name=name):
+                url = reverse(name)
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, HTTPStatus.OK)
+
     def test_availability_detail_edit_and_delete(self):
         users_statuses = (
             (self.author, HTTPStatus.OK),
