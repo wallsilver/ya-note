@@ -1,3 +1,4 @@
+"""Тесты для проверки логики работы с заметками."""
 from http import HTTPStatus
 
 from django.test import Client, TestCase
@@ -13,8 +14,6 @@ User = get_user_model()
 
 
 class NoteFormTest(TestCase):
-    """Тестирование логики приложения."""
-
     @classmethod
     def setUpTestData(cls):
         """Создание тестовых данных: пользователя и тестовой заметки."""
@@ -35,23 +34,15 @@ class NoteFormTest(TestCase):
         }
         cls.url = reverse('notes:add')
 
-    def test_anonymous_user_cant_create_note(self):
-        """Анонимный пользователь не может создать заметку"""
-        # Получаем URL через reverse
-        # Совершаем запрос от анонимного клиента
-        response = self.client.post(self.url, data=self.form_data)
-
-        # Проверяем редирект на страницу логина
-        login_url = reverse('users:login')
-        expected_url = f'{login_url}?next={self.url}'
-        self.assertRedirects(response, expected_url)
-
-        # Проверяем, что количество заметок не изменилось
-        # (в setUp уже создана 1 заметка)
-        self.assertEqual(Note.objects.count(), 1)
-
     def test_authorized_user_can_create_note(self):
-        """Авторизованный пользователь может создать заметку."""
+        """Авторизованный пользователь может создать заметку.
+
+        Проверяет, что:
+        - происходит редирект на страницу успеха
+        - заметка появляется в БД
+        - все атрибуты заметки соответствуют переданным данным
+        - автор заметки соответствует ожидаемому
+        """
         # Отправляем POST-запрос для создания заметки
         response = self.auth_client.post(self.url, data=self.form_data)
 
@@ -70,12 +61,25 @@ class NoteFormTest(TestCase):
         self.assertEqual(new_note.slug, self.form_data['slug'])
         self.assertEqual(new_note.author, self.user)
 
-    def test_slug_uniqueness_validation(self):
-        """
-        Невозможно создать две заметки с одинаковым slug.
+    def test_anonymous_user_cant_create_note(self):
+        """Анонимный пользователь не может создать заметку.
 
-        При попытке создать заметку с уже существующим slug
-        форма должна быть невалидной и содержать ошибку.
+        Проверяет, что:
+        - происходит редирект на страницу логина
+        - заметка не создается в БД
+        """
+        response = self.client.post(self.url, data=self.form_data)
+        login_url = reverse('users:login')
+        expected_url = f'{login_url}?next={self.url}'
+        self.assertRedirects(response, expected_url)
+        self.assertEqual(Note.objects.count(), 1)
+
+    def test_slug_uniqueness_validation(self):
+        """Нельзя создать заметку с неуникальным slug.
+
+        Проверяет, что:
+        - возвращается ошибка валидации для поля slug
+        - количество заметок в БД не изменяется
         """
         self.form_data['slug'] = 'test-note'  # Используем существующий slug
         form = NoteForm(data=self.form_data)
@@ -112,16 +116,9 @@ class TestNoteEditDelete(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        # Создаём новость в БД.
-
-        # Формируем адрес блока с комментариями, который понадобится для тестов.
-        # Создаём пользователя - автора комментария.
         cls.author = User.objects.create(username='Автор заметки')
-        # Создаём клиент для пользователя-автора.
         cls.author_client = Client()
-        # "Логиним" пользователя в клиенте.
         cls.author_client.force_login(cls.author)
-        # Делаем всё то же самое для второго пользователя
         cls.not_author = User.objects.create(username='Не автор')
         cls.not_author_client = Client()
         cls.not_author_client.force_login(cls.not_author)
@@ -136,12 +133,34 @@ class TestNoteEditDelete(TestCase):
             'text': cls.NEW_NOTE_TEXT,
             'slug': cls.note.slug
         }
-        # URL для редактирования комментария.
         cls.edit_url = reverse('notes:edit', args=(cls.note.slug,))
-        # URL для удаления комментария.
         cls.delete_url = reverse('notes:delete', args=(cls.note.slug,))
-        # Формируем данные для POST-запроса по обновлению комментария.
-        login_url = reverse('users:login')
+
+    def test_author_can_edit_note(self):
+        """Автор может редактировать свою заметку.
+
+        Проверяет, что:
+        - происходит редирект на страницу успеха
+        - данные заметки обновляются в БД
+        """
+        response = self.author_client.post(self.edit_url, data=self.form_data)
+        self.assertRedirects(response, reverse('notes:success'))
+        self.note.refresh_from_db()
+        self.assertEqual(self.note.text, self.NEW_NOTE_TEXT)
+
+    def test_not_author_cant_edit_note(self):
+        """Не-автор не может редактировать чужую заметку.
+
+        Проверяет, что:
+        - возвращается статус 404
+        - данные заметки не изменяются в БД
+        """
+        response = self.not_author_client.post(
+            self.edit_url, data=self.form_data
+        )
+        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
+        notes_count = Note.objects.count()
+        self.assertEqual(notes_count, 1)
 
     def test_author_can_delete_note(self):
         """Автор может удалить свою заметку.
@@ -164,30 +183,6 @@ class TestNoteEditDelete(TestCase):
         - заметка остается в БД
         """
         response = self.not_author_client.delete(self.delete_url)
-        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
-        notes_count = Note.objects.count()
-        self.assertEqual(notes_count, 1)
-
-    def test_author_can_edit_note(self):
-        """Автор может редактировать свою заметку.
-
-        Проверяет, что:
-        - происходит редирект на страницу успеха
-        - данные заметки обновляются в БД
-        """
-        response = self.author_client.post(self.edit_url, data=self.form_data)
-        self.assertRedirects(response, reverse('notes:success'))
-        self.note.refresh_from_db()
-        self.assertEqual(self.note.text, self.NEW_NOTE_TEXT)
-
-    def test_not_author_cant_edit_note(self):
-        """Не-автор не может редактировать чужую заметку.
-
-            Проверяет, что:
-            - возвращается статус 404
-            - данные заметки не изменяются в БД
-            """
-        response = self.not_author_client.post(self.edit_url, data=self.form_data)
         self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
         notes_count = Note.objects.count()
         self.assertEqual(notes_count, 1)
