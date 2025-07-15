@@ -102,14 +102,8 @@ class NoteFormTest(TestCase):
         self.assertEqual(Note.objects.count(), 2)
         self.assertRedirects(response, reverse('notes:success'))
 
-    def test_other_note_edit_delete(self):
-        """
-        Пользователь может редактировать и удалять свои заметки,
-        но не может редактировать или удалять чужие.
-        """
 
-
-class TestCommentEditDelete(TestCase):
+class TestNoteEditDelete(TestCase):
     # Тексты для комментариев не нужно дополнительно создавать
     # (в отличие от объектов в БД), им не нужны ссылки на self или cls,
     # поэтому их можно перечислить просто в атрибутах класса.
@@ -137,21 +131,63 @@ class TestCommentEditDelete(TestCase):
             slug='test-note',
             author=cls.author
         )
+        cls.form_data = {
+            'title': cls.note.title,
+            'text': cls.NEW_NOTE_TEXT,
+            'slug': cls.note.slug
+        }
         # URL для редактирования комментария.
         cls.edit_url = reverse('notes:edit', args=(cls.note.slug,))
         # URL для удаления комментария.
         cls.delete_url = reverse('notes:delete', args=(cls.note.slug,))
         # Формируем данные для POST-запроса по обновлению комментария.
-        cls.form_data = {'text': cls.NEW_NOTE_TEXT}
+        login_url = reverse('users:login')
 
-    def test_author_can_delete_comment(self):
-        # От имени автора комментария отправляем DELETE-запрос на удаление.
+    def test_author_can_delete_note(self):
+        """Автор может удалить свою заметку.
+
+        Проверяет, что:
+        - происходит редирект на страницу успеха
+        - заметка удаляется из БД
+        """
         response = self.author_client.delete(self.delete_url)
-        # Проверяем, что редирект привёл к разделу с комментариями.
         self.assertRedirects(response, reverse('notes:success'))
-        # Заодно проверим статус-коды ответов.
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
-        # Считаем количество комментариев в системе.
-        comments_count = Note.objects.count()
-        # Ожидаем ноль комментариев в системе.
-        self.assertEqual(comments_count, 0)
+        notes_count = Note.objects.count()
+        self.assertEqual(notes_count, 0)
+
+    def test_no_author_cant_delete_note(self):
+        """Не-автор не может удалить чужую заметку.
+
+        Проверяет, что:
+        - возвращается статус 404
+        - заметка остается в БД
+        """
+        response = self.not_author_client.delete(self.delete_url)
+        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
+        notes_count = Note.objects.count()
+        self.assertEqual(notes_count, 1)
+
+    def test_author_can_edit_note(self):
+        """Автор может редактировать свою заметку.
+
+        Проверяет, что:
+        - происходит редирект на страницу успеха
+        - данные заметки обновляются в БД
+        """
+        response = self.author_client.post(self.edit_url, data=self.form_data)
+        self.assertRedirects(response, reverse('notes:success'))
+        self.note.refresh_from_db()
+        self.assertEqual(self.note.text, self.NEW_NOTE_TEXT)
+
+    def test_not_author_cant_edit_note(self):
+        """Не-автор не может редактировать чужую заметку.
+
+            Проверяет, что:
+            - возвращается статус 404
+            - данные заметки не изменяются в БД
+            """
+        response = self.not_author_client.post(self.edit_url, data=self.form_data)
+        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
+        notes_count = Note.objects.count()
+        self.assertEqual(notes_count, 1)
