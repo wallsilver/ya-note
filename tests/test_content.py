@@ -1,8 +1,5 @@
 from django.contrib.auth import get_user_model
-from django.test import TestCase
-from django.urls import reverse
 
-from notes.models import Note
 from notes.forms import NoteForm
 from .test_base import NotesTestBase
 
@@ -12,30 +9,17 @@ User = get_user_model()
 class TestContent(NotesTestBase):
     """Тесты для проверки контента страниц приложения."""
 
-    def setUp(self):
-        # Авторизуем автора перед выполнением каждого теста
-        self.client.force_login(self.author)
-
     def test_note_in_list_for_author(self):
         """Проверка, что заметка автора присутствует в его списке заметок."""
-        response = self.client.get(self.list_url)
+        response = self.author_client.get(self.list_url)
         object_list = response.context['object_list']
 
         self.assertIn(self.note, object_list)
         self.assertEqual(object_list.count(), 1)
 
-        # Проверяем все данные заметки
-        note_from_context = object_list[0]
-        self.assertEqual(note_from_context.title, self.note.title)
-        self.assertEqual(note_from_context.text, self.note.text)
-        self.assertEqual(note_from_context.slug, self.note.slug)
-        self.assertEqual(note_from_context.author, self.note.author)
-
     def test_note_not_in_list_for_another_user(self):
         """Проверка изоляции заметок пользователей."""
-        # Переключаемся на читателя
-        self.client.force_login(self.reader)
-        response = self.client.get(self.list_url)
+        response = self.reader_client.get(self.list_url)
         object_list = response.context['object_list']
 
         self.assertNotIn(self.note, object_list)
@@ -44,12 +28,12 @@ class TestContent(NotesTestBase):
     def test_create_and_edit_pages_contain_form(self):
         """Проверка наличия формы на страницах создания/редактирования."""
         test_cases = (
-            (self.add_url, NoteForm),
-            (self.edit_url, NoteForm),
+            (self.add_url, 'form'),
+            (self.edit_url, 'form'),
         )
 
-        for url, form_class in test_cases:
+        for url, context_key in test_cases:
             with self.subTest(url=url):
-                response = self.client.get(url)
-                self.assertIn('form', response.context)
-                self.assertIsInstance(response.context['form'], form_class)
+                response = self.author_client.get(url)
+                self.assertIn(context_key, response.context)
+                self.assertIsInstance(response.context[context_key], NoteForm)

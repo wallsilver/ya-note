@@ -12,11 +12,19 @@ class NotesTestBase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        # Создаем пользователей
+        super().setUpTestData()
+
+        # 1. Создаем пользователей
         cls.author = User.objects.create(username='Автор')
         cls.reader = User.objects.create(username='Читатель')
 
-        # Создаем тестовую заметку
+        # 2. Создаем и авторизуем клиентов
+        cls.author_client = cls.client_class()
+        cls.author_client.force_login(cls.author)
+        cls.reader_client = cls.client_class()
+        cls.reader_client.force_login(cls.reader)
+
+        # 3. Создаем тестовую заметку
         cls.note = Note.objects.create(
             title='Заголовок',
             text='Текст заметки',
@@ -24,7 +32,7 @@ class NotesTestBase(TestCase):
             author=cls.author
         )
 
-        # Предварительно создаем все URL
+        # 4. Подготавливаем URL-адреса
         cls.list_url = reverse('notes:list')
         cls.add_url = reverse('notes:add')
         cls.edit_url = reverse('notes:edit', args=(cls.note.slug,))
