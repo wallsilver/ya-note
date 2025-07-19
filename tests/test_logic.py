@@ -16,7 +16,9 @@ class NoteCreationTest(NotesTestBase):
     def test_author_can_create_note(self):
         """Автор может создать заметку."""
         initial_count = Note.objects.count()
-        response = self.author_client.post(self.add_url, data=self.new_note_data)
+        response = self.author_client.post(
+            self.add_url, data=self.new_note_data
+        )
 
         self.assertRedirects(response, self.success_url)
         notes_count = Note.objects.count()
@@ -40,12 +42,17 @@ class NoteCreationTest(NotesTestBase):
         form = NoteForm(data=self.new_note_data)
 
         self.assertFalse(form.is_valid())
-        self.assertEqual(form.errors['slug'], [f'{self.note.slug}{WARNING}'])
+        self.assertEqual(
+            form.errors['slug'],
+            [f'{self.note.slug}{WARNING}']
+        )
 
     def test_slug_auto_generation(self):
         """Проверка автоматической генерации slug."""
         self.new_note_data.pop('slug')
-        response = self.author_client.post(self.add_url, data=self.new_note_data)
+        response = self.author_client.post(
+            self.add_url, data=self.new_note_data
+        )
 
         new_note = Note.objects.last()
         expected_slug = slugify(self.new_note_data['title'])
@@ -59,7 +66,9 @@ class NoteEditDeleteTest(NotesTestBase):
     def test_author_can_edit_note(self):
         """Автор может редактировать свою заметку."""
         initial_count = Note.objects.count()
-        response = self.author_client.post(self.edit_url, data=self.new_note_data)
+        response = self.author_client.post(
+            self.edit_url, data=self.new_note_data
+        )
 
         self.assertRedirects(response, self.success_url)
         notes_count = Note.objects.count()
@@ -71,7 +80,9 @@ class NoteEditDeleteTest(NotesTestBase):
         """Читатель не может редактировать чужую заметку."""
         initial_count = Note.objects.count()
         original_text = self.note.text
-        response = self.reader_client.post(self.edit_url, data=self.new_note_data)
+        response = self.reader_client.post(
+            self.edit_url, data=self.new_note_data
+        )
 
         self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
         notes_count = Note.objects.count()

@@ -39,6 +39,10 @@ class NotesTestBase(TestCase):
         cls.success_url = reverse('notes:success')
         cls.delete_url = reverse('notes:delete', args=(cls.note.slug,))
         cls.login_url = reverse('users:login')
+        cls.logout_url = reverse('users:logout')
+        cls.signup_url = reverse('users:signup')
+        cls.home_url = reverse('notes:home')
+        cls.detail_url = reverse('notes:detail', args=(cls.note.slug,))
 
         cls.new_note_data = {
             'title': 'Новая заметка',
